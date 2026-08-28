@@ -9,33 +9,88 @@
 #     wget -qO- https://raw.githubusercontent.com/threce/traffic-burner/main/deploy.sh | bash
 #
 #  脚本会：
-#    1) 交互收集：端口、用户名、密码
-#    2) git clone 仓库到 ${HOME}/traffic-burner-deploy
-#    3) 用 docker build + docker compose 拉起容器
+#    1) 检测依赖 git/curl/wget/docker，缺失自动安装
+#    2) 交互收集：端口、用户名、密码
+#    3) git clone 仓库到 ${HOME}/traffic-burner-deploy
+#    4) 用 docker build + docker compose 拉起容器
 # =============================================================
 set -euo pipefail
 
 REPO_URL="https://github.com/threce/traffic-burner.git"
 WORK_DIR="${HOME}/traffic-burner-deploy"
 
-# ---------- 检测 docker ----------
-if ! command -v docker >/dev/null 2>&1; then
-  echo "❌ 未检测到 docker，请先安装：curl -fsSL https://get.docker.com | sh"
-  exit 1
-fi
-if ! docker compose version >/dev/null 2>&1 && ! command -v docker-compose >/dev/null 2>&1; then
-  echo "❌ 未检测到 docker compose，请安装 docker compose 插件。"
-  exit 1
-fi
-# ---------- 检测 git ----------
-if ! command -v git >/dev/null 2>&1; then
-  echo "❌ 未检测到 git，请先安装 git：apt install -y git / yum install -y git"
-  exit 1
-fi
+# ---------- 依赖准备：检测缺失并自动安装 git / curl / wget / docker ----------
+# 返回系统包管理器名：apt/yum/dnf/apk，找不到返回空
+detect_pkgmgr() {
+  if command -v apt-get >/dev/null 2>&1; then echo "apt"
+  elif command -v dnf >/dev/null 2>&1; then echo "dnf"
+  elif command -v yum >/dev/null 2>&1; then echo "yum"
+  elif command -v apk >/dev/null 2>&1; then echo "apk"
+  else echo ""; fi
+}
+
+# 用包管理器安装一个或多个包
+install_pkg() {
+  local pm; pm="$(detect_pkgmgr)"
+  if [ -z "${pm}" ]; then
+    echo "❌ 无法识别系统包管理器（apt/yum/dnf/apk），请手动安装依赖。"
+    exit 1
+  fi
+  case "${pm}" in
+    apt) apt-get update -qq && apt-get install -y -qq "$@";;
+    dnf) dnf install -y "$@";;
+    yum) yum install -y "$@";;
+    apk) apk --no-cache add "$@";;
+  esac
+}
 
 echo "=============================================="
 echo "   🔥 Traffic Burner 一键部署"
 echo "=============================================="
+echo "📦 正在检查运行环境依赖…"
+
+# ---- 基础工具：curl / wget / git ----
+for tool in curl wget git; do
+  if command -v "${tool}" >/dev/null 2>&1; then
+    echo "  ✓ ${tool} 已安装"
+  else
+    echo "  ⬆ 未检测到 ${tool}，正在自动安装…"
+    install_pkg "${tool}"
+    echo "  ✓ ${tool} 安装完成"
+  fi
+done
+
+# ---- Docker ----
+if ! command -v docker >/dev/null 2>&1; then
+  echo "  ⬆ 未检测到 docker，正在自动安装（官方脚本）…"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL https://get.docker.com | sh
+  elif command -v wget >/dev/null 2>&1; then
+    wget -qO- https://get.docker.com | sh
+  else
+    echo "❌ 安装 docker 需要 curl 或 wget。"
+    exit 1
+  fi
+  echo "  ✓ docker 安装完成"
+else
+  echo "  ✓ docker 已安装"
+fi
+
+# ---- Docker Compose 插件（docker compose / docker-compose）----
+if ! docker compose version >/dev/null 2>&1 && ! command -v docker-compose >/dev/null 2>&1; then
+  echo "  ⬆ 未检测到 docker compose，正在自动安装（docker compose 插件）…"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
+      -o /usr/local/bin/docker-compose
+    chmod +x /usr/local/bin/docker-compose
+    echo "  ✓ docker compose 安装完成"
+  else
+    echo "❌ 未检测到 docker compose，缺 curl 无法自动安装，请手动安装 docker compose 插件。"
+    exit 1
+  fi
+fi
+
+echo "===== 依赖检查完成 ====="
 
 # ---------- 对话框：端口 ----------
 default_port=8080
