@@ -39,7 +39,7 @@ echo "=============================================="
 
 # ---------- 对话框：端口 ----------
 default_port=8080
-read -r -p "请输入对外端口 [默认 ${default_port}]: " tb_port
+read -r -p "请输入对外端口 [默认 ${default_port}]: " tb_port < /dev/tty
 tb_port="${tb_port:-${default_port}}"
 # 校验端口是数字
 if ! [[ "${tb_port}" =~ ^[0-9]+$ ]] || [ "${tb_port}" -lt 1 ] || [ "${tb_port}" -gt 65535 ]; then
@@ -49,12 +49,12 @@ fi
 
 # ---------- 对话框：用户名 ----------
 default_user=admin
-read -r -p "请输入管理用户名 [默认 ${default_user}]: " tb_user
+read -r -p "请输入管理用户名 [默认 ${default_user}]: " tb_user < /dev/tty
 tb_user="${tb_user:-${default_user}}"
 
 # ---------- 对话框：密码 ----------
 default_pass=changeme
-read -r -s -p "请输入管理密码（输入时不显示，建议 ≥12 位随机） [默认 ${default_pass}]: " tb_pass
+read -r -s -p "请输入管理密码（输入时不显示，建议 ≥12 位随机） [默认 ${default_pass}]: " tb_pass < /dev/tty
 echo ""
 tb_pass="${tb_pass:-${default_pass}}"
 
