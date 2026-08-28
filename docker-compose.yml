@@ -12,3 +12,5 @@ services:
       AUTH_PASS: "${TB_PASS:-changeme}"
       TG_BOT_TOKEN: "${TG_BOT_TOKEN:-}"
       TG_CHAT_ID: "${TG_CHAT_ID:-}"
+    volumes:
+      - ./data:/data
