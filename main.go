@@ -81,6 +81,7 @@ func main() {
 	fileServer := http.FileServer(http.FS(sub))
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("/login", srv.serveLoginPage)
 	mux.HandleFunc("/api/login-code", srv.handleLoginCode)
 	mux.HandleFunc("/api/login", srv.handleLogin)
 	mux.HandleFunc("/api/logout", srv.withAuth(srv.handleLogout))

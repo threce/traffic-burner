@@ -89,3 +89,14 @@ func genToken() string {
 	rand.Read(b)
 	return hex.EncodeToString(b)
 }
+
+// serveLoginPage 返回独立的登录页 /login（无需登录即可访问）。
+func (s *Server) serveLoginPage(w http.ResponseWriter, r *http.Request) {
+	data, err := webFS.ReadFile("web/login.html")
+	if err != nil {
+		http.Error(w, "login page not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(data)
+}
