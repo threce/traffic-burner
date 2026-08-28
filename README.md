@@ -11,7 +11,7 @@
 - **多线程并发**：浏览器端支持最多 32 线程，服务端直发支持最多 64 条 TCP 连接。
 - **自定义消耗量**：可设固定总量（MB/GB）或不限时长直到手动停止。
 - **服务端直发**：服务器主动向目标 host:port 建立连接发送数据，可后台无人值守、关闭页面也不中断。
-- **多机互打**：配合多台服务器，可互相指向对方公网 IP 实现超高带宽互发。
+- **多机互打**：配合多台服务器，可互相指向对方公网 IP 实现超高带宽互 blast。
 - **基础鉴权**：HTTP Basic Auth，部署时可设置用户名/密码，防止被滥用。
 - **实时统计**：Web 页面每秒刷新上传/下载总量、实时速率、活跃连接数。
 
@@ -29,17 +29,19 @@
 
 ## 快速开始（Docker）
 
-### 方式一：一键部署脚本
+### 方式一：一行命令部署（推荐）
 
-在装有 Docker 的服务器上：
+在装有 Docker 的服务器上，复制任意一行执行即可，脚本会通过交互对话框依次询问**端口、用户名、密码**，然后自动构建并启动容器：
 
 ```bash
-git clone https://github.com/threce/traffic-burner.git
-cd traffic-burner
-bash deploy.sh
+# curl 方式
+curl -fsSL https://raw.githubusercontent.com/threce/traffic-burner/main/deploy.sh | bash
+
+# wget 方式
+wget -qO- https://raw.githubusercontent.com/threce/traffic-burner/main/deploy.sh | bash
 ```
 
-运行后脚本会通过交互对话框依次询问：**端口、用户名、密码**，然后自动构建并启动容器。访问 `http://<服务器IP>:<端口>`，用你设置的用户名/密码登录。
+脚本为**自包含**版本，无需先手动 clone 仓库——它会自动 `git clone` 源码到 `~/traffic-burner-deploy`，构建镜像并用 docker compose 启动。访问 `http://<服务器IP>:<端口>`，用你设置的用户名/密码登录。
 
 ### 方式二：docker compose
 
