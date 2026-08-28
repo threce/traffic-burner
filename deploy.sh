@@ -39,7 +39,7 @@ install_pkg() {
   esac
 }
 
-# 检查并自动安装运行环境依赖
+# 检查并自动安装运行环境依赖；并检测 docker 权限，必要时自动用 sudo 执行
 ensure_deps() {
   echo "📦 正在检查运行环境依赖…"
   local tool
@@ -79,6 +79,26 @@ ensure_deps() {
       echo "❌ 未检测到 docker compose，缺 curl 无法自动安装，请手动安装。"
       exit 1
     fi
+  fi
+
+  # ---- docker 权限自检：当前用户无法访问 docker daemon 时，尝试用 sudo ----
+  if ! docker info >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
+      echo "  ⚠ 当前用户无 docker 权限，已自动切换为 sudo 执行 docker 命令。"
+      DOCKER="sudo docker"
+      COMPOSE="sudo docker compose"
+      COMPOSE_V1="sudo docker-compose"
+    else
+      echo "  ❌ 当前用户无 docker 权限，且无法用 sudo 执行。"
+      echo "     请执行下面命令把当前用户加入 docker 组后重新登录，再重跑本脚本："
+      echo "       sudo usermod -aG docker \$USER && newgrp docker"
+      echo "     或直接以 root 运行。"
+      exit 1
+    fi
+  else
+    DOCKER="docker"
+    COMPOSE="docker compose"
+    COMPOSE_V1="docker-compose"
   fi
   echo "===== 依赖检查完成 ====="
 }
@@ -172,7 +192,7 @@ do_uninstall() {
   echo "✅ 正在停止并移除容器…"
   (cd "${WORK_DIR}" && compose_down 2>/dev/null || true)
   echo "✅ 正在删除镜像…"
-  docker rmi traffic-burner:latest 2>/dev/null || true
+  ${DOCKER} rmi traffic-burner:latest 2>/dev/null || true
   echo "✅ 正在清理工作目录…"
   rm -rf "${WORK_DIR}"
   echo "   ✅ 卸载完成，已删除容器、镜像与 ${WORK_DIR}。"
@@ -195,16 +215,16 @@ do_update() {
 # ---------- docker compose 封装 ----------
 compose_up() {
   if command -v docker-compose >/dev/null 2>&1 && ! docker compose version >/dev/null 2>&1; then
-    docker-compose --env-file "${WORK_DIR}/.env" up -d --build
+    ${COMPOSE_V1} --env-file "${WORK_DIR}/.env" up -d --build
   else
-    docker compose --env-file "${WORK_DIR}/.env" up -d --build
+    ${COMPOSE} --env-file "${WORK_DIR}/.env" up -d --build
   fi
 }
 compose_down() {
   if command -v docker-compose >/dev/null 2>&1 && ! docker compose version >/dev/null 2>&1; then
-    docker-compose --env-file "${WORK_DIR}/.env" down
+    ${COMPOSE_V1} --env-file "${WORK_DIR}/.env" down
   else
-    docker compose --env-file "${WORK_DIR}/.env" down
+    ${COMPOSE} --env-file "${WORK_DIR}/.env" down
   fi
 }
 
