@@ -95,7 +95,7 @@ do_install() {
   echo "------------------------------------------------"
   echo "   🔥 开始安装 Traffic Burner"
   echo "------------------------------------------------"
-  local default_port=8080 tb_port tb_user tb_pass
+  local default_port=8080 tb_port tb_user tb_pass tg_token tg_chat
   input "请输入对外端口 [默认 ${default_port}]: " tb_port
   tb_port="${tb_port:-${default_port}}"
   if ! [[ "${tb_port}" =~ ^[0-9]+$ ]] || [ "${tb_port}" -lt 1 ] || [ "${tb_port}" -gt 65535 ]; then
@@ -111,11 +111,27 @@ do_install() {
   tb_pass="${tb_pass:-changeme}"
 
   echo ""
+  echo "--- 绑定 Telegram Bot（用于动态验证码登录 + TG 指令控制）---"
+  echo "    从 @BotFather 获取 Bot Token（形如 123456:ABC-DEF...）"
+  input "请输入 Telegram Bot Token（留空则禁用 TGBot，仅账密登录）: " tg_token
+  if [ -n "${tg_token}" ]; then
+    echo "    你的个人用户 ID 可访问 @userinfobot 获取（形如 123456789）"
+    input "请输入你的 Telegram 用户 ID (chat_id): " tg_chat
+  fi
+  tg_token="${tg_token:-}"
+  tg_chat="${tg_chat:-}"
+
+  echo ""
   echo "------------------------------------------------"
   echo "  将使用以下配置："
   echo "    端口   : ${tb_port}"
   echo "    用户名 : ${tb_user}"
   echo "    密码   : ${tb_pass}"
+  if [ -n "${tg_token}" ]; then
+    echo "    TGBot  : 已启用 (chat_id=${tg_chat})"
+  else
+    echo "    TGBot  : 未启用（仅账密登录）"
+  fi
   echo "------------------------------------------------"
 
   echo "✅ 正在拉取仓库源码到 ${WORK_DIR} …"
@@ -126,6 +142,8 @@ do_install() {
 TB_PORT=${tb_port}
 TB_USER=${tb_user}
 TB_PASS=${tb_pass}
+TG_BOT_TOKEN=${tg_token}
+TG_CHAT_ID=${tg_chat}
 EOF
 
   echo "✅ 正在构建并启动容器…"
