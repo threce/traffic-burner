@@ -222,51 +222,68 @@ func (s *Server) sendOne(ctx context.Context, target string) {
 // sendHTTP 向目标 HTTP 端点持续发送 POST 请求体（通常指向另一台 traffic-burner 的 /api/upload）。
 // 目标是另一个 traffic-burner 时，其 handleUpload 会收下并丢弃，从而在目标机器上消耗“下载流量”。
 // 本机出站流量同样计入“上传流量”。
+//
+// 实现：每个请求发送一大块数据后关闭 body（让请求正常完结，对端完整接收并统计），再循环发起下一个请求。
 func (s *Server) sendHTTP(ctx context.Context, target, targetUser, targetPass string) {
-	client := &http.Client{}
+	client := &http.Client{Transport: &http.Transport{DisableKeepAlives: false}}
+	const blockSize = 64 << 20 // 每次请求发送 64MB
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
 		}
-		pr, pw := io.Pipe()
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, pr)
-		if err != nil {
-			pr.Close()
+		if !s.sendHTTPOnce(ctx, client, target, targetUser, targetPass, blockSize) {
 			return
 		}
-		req.Header.Set("Content-Type", "application/octet-stream")
-		if targetUser != "" {
-			req.SetBasicAuth(targetUser, targetPass)
-		}
-		// 后台协程持续向 body 写入，直到 ctx 取消或目标断连
-		go func() {
-			for {
-				select {
-				case <-ctx.Done():
-					pw.Close()
-					return
-				default:
-				}
-				n, err := pw.Write(s.buf)
-				if n > 0 {
-					s.stats.addUpload(int64(n))
-				}
-				if err != nil {
-					return
-				}
-			}
-		}()
-		resp, err := client.Do(req)
-		if err != nil {
-			pr.Close()
-			pw.Close()
-			return
-		}
-		io.Copy(io.Discard, resp.Body)
-		resp.Body.Close()
 	}
+}
+
+// sendHTTPOnce 发送一次完整 POST（blockSize 字节），成功返回 true；失败/取消返回 false。
+func (s *Server) sendHTTPOnce(ctx context.Context, client *http.Client, target, targetUser, targetPass string, blockSize int64) bool {
+	pr, pw := io.Pipe()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, pr)
+	if err != nil {
+		pr.Close()
+		return false
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req.Header.Set("Content-Length", strconv.FormatInt(blockSize, 10))
+	if targetUser != "" {
+		req.SetBasicAuth(targetUser, targetPass)
+	}
+	// 写入固定 blockSize 字节后关闭 body，让请求正常完结（对端能完整读到并统计）。
+	sent := int64(0)
+	go func() {
+		for sent < blockSize {
+			if err := ctx.Err(); err != nil {
+				pw.Close()
+				return
+			}
+			chunk := s.buf
+			if blockSize-sent < int64(len(chunk)) {
+				chunk = chunk[:blockSize-sent]
+			}
+			n, err := pw.Write(chunk)
+			if n > 0 {
+				sent += int64(n)
+				s.stats.addUpload(int64(n))
+			}
+			if err != nil {
+				pw.Close()
+				return
+			}
+		}
+		pw.Close() // 结束请求体
+	}()
+	resp, err := client.Do(req)
+	if err != nil {
+		pr.Close()
+		return false
+	}
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+	return true
 }
 
 // handleStats 返回全局统计 JSON。
