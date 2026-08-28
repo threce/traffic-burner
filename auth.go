@@ -22,7 +22,10 @@ func (s *Server) handleLoginCode(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if s.cfg.TelegramToken == "" {
+	s.cfgMu.RLock()
+	tgToken := s.cfg.TelegramToken
+	s.cfgMu.RUnlock()
+	if tgToken == "" {
 		writeJSON(w, map[string]any{"ok": false, "error": "TGBot 未配置，无法发送验证码"})
 		return
 	}
@@ -48,14 +51,17 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// 用户名/密码用恒定时间比较
+	s.cfgMu.RLock()
 	uOK := subtle.ConstantTimeCompare([]byte(req.User), []byte(s.cfg.AuthUser)) == 1
 	pOK := subtle.ConstantTimeCompare([]byte(req.Pass), []byte(s.cfg.AuthPass)) == 1
+	tgEnabled := s.cfg.TelegramToken != ""
+	s.cfgMu.RUnlock()
 	if !uOK || !pOK {
 		writeJSON(w, map[string]any{"ok": false, "error": "用户名或密码错误"})
 		return
 	}
 	// TGBot 验证码
-	if s.cfg.TelegramToken != "" && !s.tg.ValidateCode(req.Code) {
+	if tgEnabled && !s.tg.ValidateCode(req.Code) {
 		writeJSON(w, map[string]any{"ok": false, "error": "验证码无效或已过期"})
 		return
 	}

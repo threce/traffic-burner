@@ -22,6 +22,7 @@ var webFS embed.FS
 // Server 持有全局状态。
 type Server struct {
 	cfg   Config
+	cfgMu sync.RWMutex // 保护 cfg（设置页可热更新）
 	stats *Stats
 	buf   []byte // 预生成的随机数据缓冲，循环发送（只占内存，不占硬盘）
 	tg    *TelegramBot
@@ -73,6 +74,9 @@ func main() {
 	srv.tg.onCommand = srv.handleTelegramCommand
 	go srv.tg.Run()
 
+	// 从持久化文件加载用户设置（若存在则覆盖环境变量值）
+	srv.loadSettings()
+
 	// 嵌入的前端页面
 	sub, err := fs.Sub(webFS, "web")
 	if err != nil {
@@ -85,6 +89,8 @@ func main() {
 	mux.HandleFunc("/api/login-code", srv.handleLoginCode)
 	mux.HandleFunc("/api/login", srv.handleLogin)
 	mux.HandleFunc("/api/logout", srv.withAuth(srv.handleLogout))
+	mux.HandleFunc("/api/settings", srv.withAuth(http.HandlerFunc(srv.handleSettingsGet)))
+	mux.HandleFunc("/api/settings-update", srv.withAuth(http.HandlerFunc(srv.handleSettingsUpdate)))
 	mux.Handle("/", fileServer)
 	mux.HandleFunc("/api/download", srv.withAuth(http.HandlerFunc(srv.handleDownload)))
 	mux.HandleFunc("/api/upload", srv.withAuth(http.HandlerFunc(srv.handleUpload)))
@@ -140,8 +146,10 @@ func (s *Server) checkBasicAuth(authHeader string) bool {
 	if !ok {
 		return false
 	}
+	s.cfgMu.RLock()
 	uOK := subtle.ConstantTimeCompare([]byte(user), []byte(s.cfg.AuthUser)) == 1
 	pOK := subtle.ConstantTimeCompare([]byte(pass), []byte(s.cfg.AuthPass)) == 1
+	s.cfgMu.RUnlock()
 	return uOK && pOK
 }
 
