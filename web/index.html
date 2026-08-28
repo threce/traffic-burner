@@ -6,78 +6,116 @@
 <title>Traffic Burner · 流量消耗器</title>
 <style>
   :root {
-    --bg: #0f1420; --panel: #171e2e; --panel2: #1e2740; --line: #2a3552;
-    --text: #dbe4ff; --dim: #8b96b8; --acc: #4f8cff; --ok: #35d07f; --warn: #ffb84d; --err: #ff5c5c;
+    --bg0: #0b0f1a; --bg1: #141a2b;
+    --glass: rgba(255,255,255,.06); --glass2: rgba(255,255,255,.09); --glassborder: rgba(255,255,255,.12);
+    --text: #eef2ff; --dim: #9aa4c4; --acc: #6d8bff; --acc2: #9b7bff; --ok: #39d98a; --warn: #ffb84d; --err: #ff5c7a;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; min-height: 100vh; }
-  .wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 60px; }
-  header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
-  h1 { font-size: 22px; letter-spacing: .5px; }
-  h1 small { color: var(--dim); font-size: 13px; font-weight: normal; margin-left: 8px; }
-  .topbtns { display: flex; gap: 8px; }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
-  .panel h2 { font-size: 15px; margin-bottom: 12px; color: var(--dim); font-weight: 600; }
-  .modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
-  .mode { background: var(--panel2); border: 2px solid var(--line); border-radius: 10px; padding: 12px 14px; cursor: pointer; transition: .15s; }
-  .mode:hover { border-color: var(--acc); }
-  .mode.sel { border-color: var(--acc); background: rgba(79,140,255,.12); }
-  .mode .t { font-weight: 600; font-size: 14px; }
-  .mode .d { color: var(--dim); font-size: 12px; margin-top: 4px; line-height: 1.5; }
-  .row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
-  .field { display: flex; flex-direction: column; gap: 6px; }
+  body {
+    background: radial-gradient(1200px 700px at 20% 10%, #1c2b56 0%, transparent 55%),
+                radial-gradient(1000px 600px at 80% 90%, #3a1b56 0%, transparent 55%),
+                linear-gradient(160deg, var(--bg0), var(--bg1));
+    color: var(--text); font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    min-height: 100vh; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1020px; margin: 0 auto; padding: 28px 18px 70px; }
+  header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 22px; }
+  .logo { font-size: 24px; font-weight: 800; letter-spacing: .5px; background: linear-gradient(90deg,#8fb0ff,#c08bff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .logo small { font-size: 12px; font-weight: 400; color: var(--dim); margin-left: 8px; -webkit-text-fill-color: var(--dim); }
+  .topbtns { display: flex; gap: 10px; }
+
+  /* 毛玻璃卡片：阴影代替边框 */
+  .card {
+    background: var(--glass); backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    border-radius: 20px; padding: 22px; margin-bottom: 18px;
+    box-shadow: 0 18px 46px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  .card h2 { font-size: 14px; margin-bottom: 16px; color: var(--dim); font-weight: 700; letter-spacing: .6px; }
+
+  .modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .mode {
+    background: var(--glass2); backdrop-filter: blur(10px); border-radius: 16px; padding: 14px;
+    cursor: pointer; transition: transform .16s, box-shadow .16s, background .16s;
+    box-shadow: 0 8px 22px rgba(0,0,0,.22);
+  }
+  .mode:hover { transform: translateY(-3px); box-shadow: 0 14px 30px rgba(0,0,0,.3); }
+  .mode.sel { background: linear-gradient(135deg, rgba(109,139,255,.28), rgba(155,123,255,.22)); box-shadow: 0 14px 34px rgba(109,139,255,.28); }
+  .mode .t { font-weight: 700; font-size: 14px; }
+  .mode .d { color: var(--dim); font-size: 12px; margin-top: 6px; line-height: 1.55; }
+  .mode.sel .t { background: linear-gradient(90deg,#bcd0ff,#e0c8ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+  .row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 7px; }
   .field label { font-size: 12px; color: var(--dim); }
-  input, select { background: var(--panel2); border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 9px 12px; font-size: 14px; outline: none; }
-  input:focus, select:focus { border-color: var(--acc); }
-  input[type=number] { width: 90px; }
-  .btn { border: none; border-radius: 8px; padding: 10px 22px; font-size: 14px; font-weight: 600; cursor: pointer; transition: .15s; }
-  .btn:disabled { opacity: .45; cursor: not-allowed; }
-  .btn.primary { background: var(--acc); color: #fff; }
-  .btn.primary:hover:not(:disabled) { filter: brightness(1.1); }
-  .btn.danger { background: var(--err); color: #fff; }
-  .btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--dim); }
-  .btn.ghost:hover { color: var(--text); border-color: var(--acc); }
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-  .stat { background: var(--panel2); border-radius: 10px; padding: 12px 14px; }
-  .stat .v { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .stat .k { font-size: 12px; color: var(--dim); margin-top: 3px; }
-  .stat .v.green { color: var(--ok); } .stat .v.blue { color: var(--acc); } .stat .v.orange { color: var(--warn); }
-  .threads { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
-  .thread { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--dim); }
-  .thread .bar { flex: 1; height: 6px; background: var(--panel2); border-radius: 3px; overflow: hidden; }
-  .thread .bar i { display: block; height: 100%; width: 0; background: var(--acc); transition: width .4s; }
-  .thread.done .bar i { background: var(--ok); }
-  .thread .b { width: 110px; text-align: right; font-variant-numeric: tabular-nums; }
+  input, select {
+    background: rgba(0,0,0,.28); border: none; outline: none; color: var(--text);
+    border-radius: 12px; padding: 10px 14px; font-size: 14px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+    transition: box-shadow .15s;
+  }
+  input:focus, select:focus { box-shadow: inset 0 0 0 1px var(--acc), 0 0 0 3px rgba(109,139,255,.18); }
+  input[type=number] { width: 92px; }
+
+  .btn {
+    border: none; border-radius: 14px; padding: 11px 24px; font-size: 14px; font-weight: 700; cursor: pointer;
+    color: #fff; transition: transform .14s, box-shadow .14s, filter .14s;
+    box-shadow: 0 10px 24px rgba(0,0,0,.3);
+  }
+  .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+  .btn.primary { background: linear-gradient(135deg,#5b7aff,#9b7bff); }
+  .btn.primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(109,139,255,.4); }
+  .btn.danger { background: linear-gradient(135deg,#ff5c7a,#ff8a5c); }
+  .btn.ghost { background: var(--glass2); color: var(--dim); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
+  .btn.ghost:hover:not(:disabled) { color: var(--text); }
+  .btn.mini { padding: 8px 14px; font-size: 12px; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .stat { background: var(--glass2); border-radius: 16px; padding: 14px; box-shadow: 0 8px 22px rgba(0,0,0,.22); }
+  .stat .v { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .stat .k { font-size: 12px; color: var(--dim); margin-top: 4px; }
+  .stat .v.up { color: #ffb3c6; } .stat .v.down { color: #7de3a8; } .stat .v.total { color: #cdb0ff; }
+
+  .threads { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+  .thread { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--dim); }
+  .thread .bar { flex: 1; height: 8px; background: rgba(0,0,0,.3); border-radius: 6px; overflow: hidden; }
+  .thread .bar i { display: block; height: 100%; width: 0; border-radius: 6px; background: linear-gradient(90deg,#5b7aff,#9b7bff); transition: width .35s; }
+  .thread.down .bar i { background: linear-gradient(90deg,#39d98a,#7de3a8); }
+  .thread .b { width: 120px; text-align: right; font-variant-numeric: tabular-nums; }
   .hidden { display: none !important; }
-  #login { position: fixed; inset: 0; background: rgba(8,11,18,.92); display: flex; align-items: center; justify-content: center; z-index: 50; }
-  #login .box { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 28px; width: 320px; }
-  #login h2 { font-size: 18px; margin-bottom: 6px; }
-  #login p { color: var(--dim); font-size: 13px; margin-bottom: 16px; }
-  #login .field { margin-bottom: 12px; }
+  .note { background: rgba(255,184,77,.1); border-radius: 14px; padding: 12px 14px; font-size: 12px; color: var(--warn); margin-top: 14px; line-height: 1.6; box-shadow: 0 6px 18px rgba(0,0,0,.2); }
+  .hint { color: var(--dim); font-size: 12px; margin-top: 12px; line-height: 1.7; }
+  #sendStatus { margin-top: 12px; font-size: 13px; color: var(--ok); line-height: 1.6; }
+  .err { color: var(--err); font-size: 13px; margin-top: 10px; min-height: 18px; }
+
+  /* 登录 */
+  #login { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 60; background: radial-gradient(800px 500px at 30% 20%, #1a2a55, transparent 60%); }
+  #login .box { width: 360px; padding: 30px; }
+  #login h2 { font-size: 20px; margin-bottom: 4px; background: linear-gradient(90deg,#8fb0ff,#c08bff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  #login p { color: var(--dim); font-size: 13px; margin-bottom: 18px; }
+  #login .field { margin-bottom: 14px; }
   #login .btn { width: 100%; }
-  .err { color: var(--err); font-size: 13px; margin-top: 8px; min-height: 18px; }
-  .hint { color: var(--dim); font-size: 12px; margin-top: 8px; line-height: 1.6; }
-  .note { background: rgba(255,184,77,.08); border: 1px solid rgba(255,184,77,.3); color: var(--warn); border-radius: 8px; padding: 10px 12px; font-size: 12px; margin-top: 12px; line-height: 1.6; }
-  #sendStatus { margin-top: 10px; font-size: 13px; color: var(--ok); }
+  .code-row { display: flex; gap: 8px; align-items: center; }
+  .code-row input { flex: 1; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>🔥 Traffic Burner <small>流量消耗器 · 内存直发 · 不占硬盘</small></h1>
+    <div class="logo">🔥 Traffic Burner <small>流量消耗器 · 内存直发 · 不占硬盘</small></div>
     <div class="topbtns">
-      <button class="btn ghost" id="btnReset">清零统计</button>
-      <button class="btn ghost" id="btnLogout">登出</button>
+      <button class="btn ghost mini" id="btnReset">清零统计</button>
+      <button class="btn ghost mini" id="btnLogout">登出</button>
     </div>
   </header>
 
   <!-- 模式选择 -->
-  <div class="panel">
+  <div class="card">
     <h2>1. 选择消耗方向</h2>
     <div class="modes" id="modes">
       <div class="mode sel" data-mode="upload">
         <div class="t">⬆ 上传流量（服务器 → 公网）</div>
-        <div class="d">浏览器多线程从服务器下载内存数据流，消耗出站流量</div>
+        <div class="d">浏览器多线程从服务器下载内存数据流，消耗服务器出站流量</div>
       </div>
       <div class="mode" data-mode="download">
         <div class="t">⬇ 下载流量（公网 → 服务器）</div>
@@ -85,20 +123,20 @@
       </div>
       <div class="mode" data-mode="both">
         <div class="t">⇅ 双向同时消耗</div>
-        <div class="d">一半线程上传、一半线程下载，同时消耗双向流量</div>
+        <div class="d">一半线程消耗上传、一半消耗下载，双向并行</div>
       </div>
       <div class="mode" data-mode="send">
         <div class="t">🚀 服务端直发（无需浏览器）</div>
-        <div class="d">服务器主动向目标地址建立 TCP 连接发送数据，可后台无人值守</div>
+        <div class="d">服务器主动向目标建立连接发送数据，后台无人值守</div>
       </div>
     </div>
   </div>
 
-  <!-- 浏览器模式（上传/下载/双向） -->
-  <div class="panel" id="panelWeb">
+  <!-- 浏览器模式 -->
+  <div class="card" id="panelWeb">
     <h2>2. 参数设置</h2>
     <div class="row">
-      <div class="field"><label>线程数（并发连接）</label><input type="number" id="threads" min="1" max="32" value="8"></div>
+      <div class="field"><label>线程数（1-64）</label><input type="number" id="threads" min="1" max="64" value="8"></div>
       <div class="field"><label>消耗总量</label><input type="number" id="amount" min="1" value="10"></div>
       <div class="field"><label>单位</label>
         <select id="unit"><option value="MB">MB</option><option value="GB">GB</option></select>
@@ -113,8 +151,8 @@
     <div class="threads hidden" id="threadList"></div>
   </div>
 
-  <!-- 服务端直发模式 -->
-  <div class="panel hidden" id="panelSend">
+  <!-- 服务端直发 -->
+  <div class="card hidden" id="panelSend">
     <h2>2. 直发参数</h2>
     <div class="row">
       <div class="field"><label>直发模式</label>
@@ -123,40 +161,46 @@
           <option value="http">HTTP 打到对方 /api/upload（目标 URL）</option>
         </select>
       </div>
-      <div class="field"><label>目标地址</label><input type="text" id="sendTarget" placeholder="echo 1.2.3.4:443 或 http://对方IP:端口" style="width:260px"></div>
-      <div class="field" id="sendCredField"><label>对方用户名（HTTP模式，可选）</label><input type="text" id="sendUser" style="width:120px"></div>
-      <div class="field" id="sendCredPassField"><label>对方密码（HTTP模式，可选）</label><input type="password" id="sendPass" style="width:120px"></div>
+      <div class="field"><label>目标地址</label><input type="text" id="sendTarget" placeholder="1.2.3.4:443 或 http://对方IP:端口" style="width:270px"></div>
+      <div class="field" id="sendCredField"><label>对方用户名（HTTP，可选）</label><input type="text" id="sendUser" style="width:110px"></div>
+      <div class="field" id="sendCredPassField"><label>对方密码（HTTP，可选）</label><input type="password" id="sendPass" style="width:110px"></div>
       <div class="field"><label>线程数（1-64）</label><input type="number" id="sendThreads" min="1" max="64" value="16"></div>
       <div class="field"><label>持续秒数</label><input type="number" id="sendSeconds" min="1" max="3600" value="60"></div>
       <button class="btn primary" id="btnSendStart">▶ 开始直发</button>
       <button class="btn danger" id="btnSendStop" disabled>⏹ 停止</button>
     </div>
     <div id="sendStatus"></div>
-    <div class="note">💡 <strong>多机互打（推荐）</strong>：选「HTTP 打到对方 /api/upload」，目标填<strong>另一台 traffic-burner 的地址</strong>（如 <code>http://对方公网IP:8080</code>）。对方会收下并丢弃数据 → 对方消耗「下载流量」、本机消耗「上传流量」。两台机器互相指向对方即可同时刷满双向流量，无需浏览器常驻。若指向本机公网 IP 则是「自环」，一次性同时消耗上传+下载。</div>
+    <div class="note">💡 <strong>多机互打</strong>：选「HTTP 打到对方 /api/upload」，目标填另一台 traffic-burner 地址，对方收下并丢弃 → 对方消耗下载、本机消耗上传。两台互相指向即可同时刷满双向，无需浏览器常驻。</div>
   </div>
 
-  <!-- 实时统计 -->
-  <div class="panel">
+  <!-- 统计 -->
+  <div class="card">
     <h2>实时统计</h2>
     <div class="stats">
-      <div class="stat"><div class="v blue" id="stUp">0 B</div><div class="k">⬆ 已消耗上传（服务器出站）</div></div>
-      <div class="stat"><div class="v green" id="stDown">0 B</div><div class="k">⬇ 已消耗下载（服务器入站）</div></div>
-      <div class="stat"><div class="v orange" id="stTotal">0 B</div><div class="k">∑ 总消耗</div></div>
+      <div class="stat"><div class="v up" id="stUp">0 B</div><div class="k">⬆ 已消耗上传（服务器出站）</div></div>
+      <div class="stat"><div class="v down" id="stDown">0 B</div><div class="k">⬇ 已消耗下载（服务器入站）</div></div>
+      <div class="stat"><div class="v total" id="stTotal">0 B</div><div class="k">∑ 总消耗</div></div>
       <div class="stat"><div class="v" id="stRate">0 B/s</div><div class="k">⏱ 实时速率（近 3 秒）</div></div>
       <div class="stat"><div class="v" id="stConns">0</div><div class="k">🔌 当前活跃连接</div></div>
       <div class="stat"><div class="v" id="stTime">0s</div><div class="k">⏳ 本次运行时长</div></div>
     </div>
-    <div class="hint">方向说明：云厂商通常把「服务器 → 公网」称为出站/上传流量，把「公网 → 服务器」称为入站/下载流量（部分厂商只对出站计费，具体看你的账单）。所有数据均在内存中生成与丢弃，<strong>不写入硬盘</strong>。</div>
+    <div class="hint">方向说明：云厂商把「服务器→公网」称为出站/上传流量，「公网→服务器」称为入站/下载流量（部分厂商只对出站计费）。所有数据在内存中生成与丢弃，<strong>不写入硬盘</strong>。</div>
   </div>
 </div>
 
-<!-- 登录弹窗 -->
+<!-- 登录 -->
 <div id="login">
-  <div class="box">
-    <h2>登录</h2>
-    <p>请输入部署时设置的用户名和密码</p>
+  <div class="card box">
+    <h2>登录 Traffic Burner</h2>
+    <p>用户名 + 密码 + Telegram 动态验证码</p>
     <div class="field"><label>用户名</label><input type="text" id="lgUser" autocomplete="username"></div>
     <div class="field"><label>密码</label><input type="password" id="lgPass" autocomplete="current-password"></div>
+    <div class="field"><label>Telegram 验证码</label>
+      <div class="code-row">
+        <input type="text" id="lgCode" maxlength="6" placeholder="6 位验证码">
+        <button class="btn ghost mini" id="btnGetCode">获取验证码</button>
+      </div>
+    </div>
     <button class="btn primary" id="lgBtn">登 录</button>
     <div class="err" id="lgErr"></div>
   </div>
@@ -172,77 +216,71 @@ const fmt = b => {
   while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
   return v.toFixed(v >= 100 ? 0 : 1) + " " + u[i];
 };
-
-let cred = localStorage.getItem("tb_cred") || "";
-const authHeaders = () => (cred ? { "Authorization": "Basic " + cred } : {});
+let token = localStorage.getItem("tb_token") || "";
+const authHeaders = () => token ? { "Authorization": "Bearer " + token } : {};
 async function api(path, opts = {}) {
   opts.headers = Object.assign(authHeaders(), opts.headers || {});
   const res = await fetch(path, opts);
-  if (res.status === 401) { showLogin(); throw new Error("unauthorized"); }
+  if (res.status === 401) { logout(false); throw new Error("unauthorized"); }
   return res;
 }
 
-/* ---------- 登录 ---------- */
-const loginEl = $("login");
-function showLogin() { loginEl.classList.remove("hidden"); }
-function hideLogin() { loginEl.classList.add("hidden"); }
+/* 登出 */
+function logout(clear = true) { if (clear) { try { fetch("/api/logout", { method: "POST", headers: authHeaders() }); } catch(e){} } token = ""; localStorage.removeItem("tb_token"); showLogin(); }
+
+/* 登录 */
+function showLogin() { $("login").classList.remove("hidden"); }
+function hideLogin() { $("login").classList.add("hidden"); }
+async function getCode() {
+  const btn = $("btnGetCode"); btn.disabled = true; btn.textContent = "发送中…";
+  try { const r = await api("/api/login-code", { method: "POST" }); const j = await r.json();
+    if (j.ok) { btn.textContent = "已发送"; setTimeout(()=>{btn.disabled=false;btn.textContent="重新获取";},2000); }
+    else { $("lgErr").textContent = j.error || "发送失败"; btn.disabled=false; btn.textContent="获取验证码"; }
+  } catch(e){ $("lgErr").textContent = "无法连接服务器"; btn.disabled=false; btn.textContent="获取验证码"; }
+}
 async function doLogin() {
-  const u = $("lgUser").value.trim(), p = $("lgPass").value;
-  if (!u || !p) { $("lgErr").textContent = "请输入用户名和密码"; return; }
-  cred = btoa(unescape(encodeURIComponent(u + ":" + p)));
+  const user = $("lgUser").value.trim(), pass = $("lgPass").value, code = $("lgCode").value.trim();
+  if (!user || !pass || !code) { $("lgErr").textContent = "请填写用户名、密码和验证码"; return; }
   try {
-    const res = await api("/api/stats");
-    if (!res.ok) throw new Error("bad status " + res.status);
-    localStorage.setItem("tb_cred", cred);
-    $("lgErr").textContent = "";
-    hideLogin();
-    pollStats();
-  } catch (e) {
-    cred = "";
-    $("lgErr").textContent = "认证失败，请检查用户名/密码";
-  }
+    const res = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user, pass, code }) });
+    const j = await res.json();
+    if (!j.ok) { $("lgErr").textContent = j.error || "登录失败"; return; }
+    token = j.token; localStorage.setItem("tb_token", token); $("lgErr").textContent = "";
+    hideLogin(); pollStats();
+  } catch(e){ $("lgErr").textContent = "无法连接服务器"; }
 }
 $("lgBtn").onclick = doLogin;
-$("lgPass").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
-$("btnLogout").onclick = () => { stopAll(); localStorage.removeItem("tb_cred"); cred = ""; showLogin(); };
+$("btnGetCode").onclick = getCode;
+$("lgCode").addEventListener("keydown", e=>{ if(e.key==="Enter") doLogin(); });
+$("btnLogout").onclick = () => logout(true);
 
-/* ---------- 模式选择 ---------- */
+/* 模式 */
 let mode = "upload";
 document.querySelectorAll(".mode").forEach(el => {
   el.onclick = () => {
     document.querySelectorAll(".mode").forEach(x => x.classList.remove("sel"));
-    el.classList.add("sel");
-    mode = el.dataset.mode;
+    el.classList.add("sel"); mode = el.dataset.mode;
     $("panelWeb").classList.toggle("hidden", mode === "send");
     $("panelSend").classList.toggle("hidden", mode !== "send");
     $("webNote").classList.add("hidden");
   };
 });
 
-/* ---------- 浏览器消耗（下载 / 上传 / 双向） ---------- */
-const PATTERN = new Uint8Array(1 << 20); // 1MB 固定内存 pattern
+/* 浏览器消耗 */
+const PATTERN = new Uint8Array(1 << 20);
 for (let i = 0; i < PATTERN.length; i++) PATTERN[i] = (i * 31) & 0xff;
+let aborter = null, threadInfo = [], runStartedAt = 0, rateWindow = [];
 
-let aborter = null;
-let threadInfo = []; // {name, bytes, done, el}
-let runStartedAt = 0;
-let lastTotal = 0, lastRateTime = 0, rateWindow = [];
-
-function bytesPerThread(total, threads) { return Math.ceil(total / threads); }
+function perThread(total, threads) { return Math.ceil(total / threads); }
 
 async function downloadThread(id, bytes, signal) {
   const url = "/api/download?id=" + id + (bytes >= 0 ? "&bytes=" + bytes : "");
   const res = await fetch(url, { headers: authHeaders(), signal });
   if (!res.ok || !res.body) return;
   const reader = res.body.getReader();
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    threadInfo[id].bytes += value.length;
-    paintThread(id);
-  }
+  while (true) { const { done, value } = await reader.read(); if (done) break; threadInfo[id].bytes += value.length; paintThread(id); }
 }
-
 function uploadThread(id, bytes, signal) {
   let sent = 0;
   const stream = new ReadableStream({
@@ -250,170 +288,98 @@ function uploadThread(id, bytes, signal) {
       if (bytes >= 0 && sent >= bytes) { c.close(); return; }
       let chunk = PATTERN;
       if (bytes >= 0 && sent + chunk.length > bytes) chunk = chunk.subarray(0, bytes - sent);
-      sent += chunk.length;
-      threadInfo[id].bytes += chunk.length;
-      paintThread(id);
-      c.enqueue(chunk);
+      sent += chunk.length; threadInfo[id].bytes += chunk.length; paintThread(id); c.enqueue(chunk);
       if (bytes >= 0 && sent >= bytes) c.close();
-    },
-    cancel() {}
+    }, cancel() {}
   });
-  return fetch("/api/upload?id=" + id, {
-    method: "POST", body: stream, duplex: "half",
-    headers: authHeaders(), signal
-  }).catch(() => {});
+  return fetch("/api/upload?id=" + id, { method: "POST", body: stream, duplex: "half", headers: authHeaders(), signal }).catch(()=>{});
 }
-
 function paintThread(id) {
-  const t = threadInfo[id];
-  if (!t || !t.el) return;
+  const t = threadInfo[id]; if (!t || !t.el) return;
   t.el.querySelector(".b").textContent = fmt(t.bytes);
   const max = t.maxBytes > 0 ? t.maxBytes : t.bytes;
   t.el.querySelector(".bar i").style.width = Math.min(100, t.bytes / max * 100) + "%";
 }
 
 function startWeb() {
-  const threads = Math.min(32, Math.max(1, parseInt($("threads").value) || 1));
+  const threads = Math.min(64, Math.max(1, parseInt($("threads").value) || 1));
   const amount = parseInt($("amount").value) || 1;
-  const unit = $("unit").value;
-  const total = amount * (unit === "GB" ? 1 << 30 : 1 << 20);
+  const total = amount * ($("unit").value === "GB" ? 1 << 30 : 1 << 20);
   const unlimited = $("limit").value === "unlimited";
-  const perThread = unlimited ? -1 : bytesPerThread(total, threads);
-  if (!unlimited && total > 0) {
-    const est = total / (20 << 20); // 假设 20MB/s 每线程，粗略估算
-    $("webNote").textContent = `预计消耗 ${fmt(total)}，约需 ${est.toFixed(0)} 秒（以实际带宽为准）。窗口保持打开，不要切走。`;
-    $("webNote").classList.remove("hidden");
-  } else {
-    $("webNote").textContent = "不限模式：将持续消耗直到你点击停止。";
-    $("webNote").classList.remove("hidden");
-  }
+  const per = unlimited ? -1 : perThread(total, threads);
+  $("webNote").textContent = unlimited ? "不限模式：将持续消耗直到你点击停止。" : `预计消耗 ${fmt(total)}，约 ${ (total/(20<<20)).toFixed(0) } 秒（实际按带宽）。保持窗口打开，不要切走。`;
+  $("webNote").classList.remove("hidden");
 
-  stopAll();
-  aborter = new AbortController();
-  const signal = aborter.signal;
-  threadInfo = [];
-  const list = $("threadList");
-  list.innerHTML = "";
-  list.classList.remove("hidden");
-
+  stopAll(); aborter = new AbortController(); const signal = aborter.signal; threadInfo = [];
+  const list = $("threadList"); list.innerHTML = ""; list.classList.remove("hidden");
   const jobs = [];
   for (let i = 0; i < threads; i++) {
-    const isUpload = (mode === "download") || (mode === "both" && i % 2 === 0);
-    const el = document.createElement("div");
-    el.className = "thread";
+    // 方向：确认消耗的是用户选择的那一侧
+    const isUpload = mode === "download" || (mode === "both" && i % 2 === 0);
+    const el = document.createElement("div"); el.className = "thread";
     el.innerHTML = `<span class="n"></span><div class="bar"><i></i></div><span class="b">0 B</span>`;
-    el.querySelector(".n").textContent = `#${i + 1} ${isUpload ? "⬆上传(入站)" : "⬇下载(出站)"}`;
+    // 标签按「消耗目标」显示，避免与用户选择冲突
+    const label = isUpload ? "⬇ 消耗下载(入站)" : "⬆ 消耗上传(出站)";
+    el.querySelector(".n").textContent = "#" + (i+1) + " " + label;
+    if (isUpload) el.classList.add("down");
     list.appendChild(el);
-    threadInfo.push({ name: isUpload ? "upload" : "download", bytes: 0, maxBytes: perThread, el });
-    if (isUpload) jobs.push(uploadThread(i, perThread, signal).then(() => finishThread(i)));
-    else jobs.push(downloadThread(i, perThread, signal).then(() => finishThread(i)));
+    threadInfo.push({ bytes: 0, maxBytes: per, el });
+    if (isUpload) jobs.push(uploadThread(i, per, signal).then(()=>finishThread(i)));
+    else jobs.push(downloadThread(i, per, signal).then(()=>finishThread(i)));
   }
-  runStartedAt = Date.now();
-  $("btnStart").disabled = true; $("btnStop").disabled = false;
-  Promise.allSettled(jobs).then(() => { $("btnStart").disabled = false; $("btnStop").disabled = true; });
+  runStartedAt = Date.now(); $("btnStart").disabled = true; $("btnStop").disabled = false;
+  Promise.allSettled(jobs).then(()=>{ $("btnStart").disabled = false; $("btnStop").disabled = true; });
 }
-
-function finishThread(id) {
-  const t = threadInfo[id];
-  if (t && t.el) { t.el.classList.add("done"); paintThread(id); }
-}
-
+function finishThread(id) { const t = threadInfo[id]; if (t && t.el) { t.el.classList.add("done"); t.el.querySelector(".bar i").style.opacity=.5; paintThread(id); } }
 function stopAll() {
-  if (aborter) { try { aborter.abort(); } catch (e) {} aborter = null; }
-  if (threadInfo.length) {
-    threadInfo.forEach(t => { if (t.el) t.el.classList.add("done"); });
-  }
+  if (aborter) { try { aborter.abort(); } catch(e){} aborter = null; }
+  threadInfo.forEach(t => { if (t.el) { t.el.classList.add("done"); t.el.querySelector(".bar i").style.opacity=.5; } });
   $("btnStart").disabled = false; $("btnStop").disabled = true;
 }
 $("btnStart").onclick = () => { if (mode === "send") startSend(); else startWeb(); };
 $("btnStop").onclick = stopAll;
 
-/* ---------- 服务端直发 ---------- */
+/* 服务端直发 */
 let sendTimer = null;
 async function startSend() {
-  const mode = $("sendMode").value;
-  const target = $("sendTarget").value.trim();
-  const threads = Math.min(64, Math.max(1, parseInt($("sendThreads").value) || 1));
-  const seconds = Math.min(3600, Math.max(1, parseInt($("sendSeconds").value) || 60));
+  const m = $("sendMode").value, target = $("sendTarget").value.trim();
+  const threads = Math.min(64, Math.max(1, parseInt($("sendThreads").value)||1));
+  const seconds = Math.min(3600, Math.max(1, parseInt($("sendSeconds").value)||60));
   if (!target) { $("sendStatus").textContent = "请填写目标地址"; return; }
   try {
-    const res = await api("/api/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        target, threads, seconds, mode,
-        target_user: $("sendUser").value.trim(),
-        target_pass: $("sendPass").value
-      })
-    });
+    const res = await api("/api/send", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target, threads, seconds, mode: m, target_user: $("sendUser").value.trim(), target_pass: $("sendPass").value }) });
     if (!res.ok) { $("sendStatus").textContent = "启动失败：" + (await res.text()); return; }
-    $("sendStatus").textContent = `已启动：${threads} 线程（${mode}）→ ${target}，持续 ${seconds} 秒。任务在服务器后台运行，可关闭本页面。`;
+    $("sendStatus").textContent = `已启动：${threads} 线程（${m}）→ ${target}，持续 ${seconds} 秒。后台运行，可关闭页面。`;
     $("btnSendStart").disabled = true; $("btnSendStop").disabled = false;
-  } catch (e) { $("sendStatus").textContent = "启动失败：" + e.message; }
+  } catch(e){ $("sendStatus").textContent = "启动失败：" + e.message; }
 }
 $("btnSendStart").onclick = startSend;
-$("btnSendStop").onclick = async () => {
-  try { await api("/api/sendstop", { method: "POST" }); } catch (e) {}
-  $("sendStatus").textContent = "已请求停止。";
-  $("btnSendStart").disabled = false; $("btnSendStop").disabled = true;
-};
+$("btnSendStop").onclick = async () => { try { await api("/api/sendstop", { method: "POST" }); } catch(e){} $("sendStatus").textContent = "已请求停止。"; $("btnSendStart").disabled=false; $("btnSendStop").disabled=true; };
+function toggleSendCred(){ const isHTTP = $("sendMode").value==="http"; $("sendCredField").classList.toggle("hidden",!isHTTP); $("sendCredPassField").classList.toggle("hidden",!isHTTP); }
+$("sendMode").addEventListener("change", toggleSendCred); toggleSendCred();
 
-// 直发模式切换时显示/隐藏对方鉴权字段（仅 HTTP 模式需要）
-function toggleSendCred() {
-  const isHTTP = $("sendMode").value === "http";
-  $("sendCredField").classList.toggle("hidden", !isHTTP);
-  $("sendCredPassField").classList.toggle("hidden", !isHTTP);
-}
-$("sendMode").addEventListener("change", toggleSendCred);
-toggleSendCred();
-
-/* ---------- 统计轮询 ---------- */
+/* 统计轮询 */
 async function pollStats() {
   try {
-    const res = await api("/api/stats");
-    if (!res.ok) return;
+    const res = await api("/api/stats"); if (!res.ok) return;
     const s = await res.json();
-    $("stUp").textContent = fmt(s.upload_bytes);
-    $("stDown").textContent = fmt(s.download_bytes);
-    $("stTotal").textContent = fmt(s.upload_bytes + s.download_bytes);
-    $("stConns").textContent = s.active_conns;
-    const total = s.upload_bytes + s.download_bytes;
-    const now = Date.now();
-    rateWindow.push([now, total]);
-    while (rateWindow.length && now - rateWindow[0][0] > 3000) rateWindow.shift();
-    if (rateWindow.length >= 2) {
-      const dt = (rateWindow[rateWindow.length - 1][0] - rateWindow[0][0]) / 1000;
-      const db = rateWindow[rateWindow.length - 1][1] - rateWindow[0][1];
-      $("stRate").textContent = fmt(dt > 0 ? db / dt : 0) + "/s";
-    }
-    $("stTime").textContent = Math.floor((now - runStartedAt) / 1000) + "s";
-    if (s.send_running) {
-      $("btnSendStart").disabled = true; $("btnSendStop").disabled = false;
-      if (sendTimer !== null) clearInterval(sendTimer);
-      const start = new Date(s.send_started_at).getTime();
-      sendTimer = setInterval(() => {
-        const el = Math.floor((Date.now() - start) / 1000);
-        $("sendStatus").textContent = `直发进行中… 已运行 ${el}s（线程 ${s.send_threads} → ${s.send_target}）`;
-      }, 1000);
-    } else if (sendTimer !== null) {
-      clearInterval(sendTimer); sendTimer = null;
-      $("btnSendStart").disabled = false; $("btnSendStop").disabled = true;
-    }
-  } catch (e) { /* 网络错误忽略 */ }
+    $("stUp").textContent = fmt(s.upload_bytes); $("stDown").textContent = fmt(s.download_bytes);
+    $("stTotal").textContent = fmt(s.upload_bytes + s.download_bytes); $("stConns").textContent = s.active_conns;
+    const total = s.upload_bytes + s.download_bytes, now = Date.now();
+    rateWindow.push([now, total]); while (rateWindow.length && now - rateWindow[0][0] > 3000) rateWindow.shift();
+    if (rateWindow.length >= 2) { const dt=(rateWindow[rateWindow.length-1][0]-rateWindow[0][0])/1000, db=rateWindow[rateWindow.length-1][1]-rateWindow[0][1]; $("stRate").textContent = fmt(dt>0?db/dt:0)+"/s"; }
+    $("stTime").textContent = Math.floor((now - runStartedAt)/1000) + "s";
+    if (s.send_running) { $("btnSendStart").disabled=true; $("btnSendStop").disabled=false;
+      if (sendTimer!==null) clearInterval(sendTimer); const start = new Date(s.send_started_at).getTime();
+      sendTimer = setInterval(()=>{ $("sendStatus").textContent = `直发进行中… ${Math.floor((Date.now()-start)/1000)}s（${s.send_threads} → ${s.send_target}）`; },1000);
+    } else if (sendTimer!==null) { clearInterval(sendTimer); sendTimer=null; $("btnSendStart").disabled=false; $("btnSendStop").disabled=true; }
+  } catch(e){/*忽略*/}
 }
 setInterval(pollStats, 1000);
+$("btnReset").onclick = async () => { try { await api("/api/reset", { method:"POST" }); } catch(e){} };
 
-/* ---------- 清零 ---------- */
-$("btnReset").onclick = async () => { try { await api("/api/reset", { method: "POST" }); } catch (e) {} };
-
-/* ---------- 初始化 ---------- */
-(async function init() {
-  if (!cred) { showLogin(); return; }
-  try {
-    const res = await api("/api/stats");
-    if (res.ok) hideLogin(); else showLogin();
-  } catch (e) { showLogin(); }
-})();
+(async function init(){ if (!token) { showLogin(); return; } try { const r = await api("/api/stats"); if (r.ok) hideLogin(); else showLogin(); } catch(e){ showLogin(); } })();
 </script>
 </body>
 </html>
