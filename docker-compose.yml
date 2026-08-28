@@ -10,5 +10,5 @@ services:
       PORT: "8080"
       AUTH_USER: "${TB_USER:-admin}"
       AUTH_PASS: "${TB_PASS:-changeme}"
-    # 少数场景可改用 host 网络让服务端直发发挥最大带宽（需自行取消注释）
-    # network_mode: host
+      TG_BOT_TOKEN: "${TG_BOT_TOKEN:-}"
+      TG_CHAT_ID: "${TG_CHAT_ID:-}"
