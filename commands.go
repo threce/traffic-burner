@@ -9,17 +9,7 @@ import (
 )
 
 // handleTelegramCommand 处理来自 Telegram 的指令，实现在聊天中完全控制消耗流量。
-// 支持指令：
-//   /help 或 /start        显示帮助
-//   /status               查看统计
-//   /burn up|down|both <size> 启动浏览器同款消耗（服务端直发到指定目标；需带目标）
-//   /send <target> <threads> <seconds>       裸 TCP 直发到 host:port
-//   /send <http-url> <threads> <seconds>     HTTP 直发到对方 /api/upload
-//   /stop                 停止服务端直发
-//   /reset                清零统计
-//   /bind                 将当前聊天绑定为本机默认用户
 func (s *Server) handleTelegramCommand(text, chatID string) {
-	// 首条消息自动绑定当前 chat 为本机默认用户
 	if s.cfg.ChatID == "" {
 		s.tg.chatID = chatID
 		s.cfg.ChatID = chatID
@@ -59,7 +49,6 @@ func (s *Server) handleTelegramCommand(text, chatID string) {
 
 func (s *Server) reply(chatID, text string) {
 	if err := s.tg.SendTo(chatID, text); err != nil {
-		// 失败静默，避免刷屏
 	}
 }
 
@@ -67,8 +56,8 @@ func (s *Server) helpText() string {
 	return `<b>🤖 Traffic Burner 指令</b>
 
 /status — 查看实时统计
-/burn &lt;up|down|both&gt; &lt;MB|GB&gt; &lt;host:port&gt; — 启动指定目标直发（HTTTP/裸TCP自动识别）
-/send &lt;host:port&gt; &lt;threads&gt; &lt;seconds&gt; — 裸 TCP 直发
+/burn &lt;up|down|both&gt; &lt;MB|GB&gt; &lt;host:port&gt; — 启动指定目标直发
+/send &lt;host:port&gt; &lt;threads&gt; &lt;seconds&gt; — 裸 TCP 直发（seconds 0=连续）
 /send &lt;http://url&gt; &lt;threads&gt; &lt;seconds&gt; — HTTP 直发到对方 /api/upload
 /stop — 停止直发
 /reset — 清零统计
@@ -90,6 +79,14 @@ func (s *Server) statusText() string {
 		humanBytes(up), humanBytes(down), conns, upSec, run)
 }
 
+// sendCtx 根据秒数创建上下文：seconds==0 表示连续（无超时，手动取消），>0 限时。
+func (s *Server) sendCtx(seconds int) (context.Context, context.CancelFunc) {
+	if seconds == 0 {
+		return context.WithCancel(context.Background())
+	}
+	return context.WithTimeout(context.Background(), time.Duration(seconds)*time.Second)
+}
+
 // cmdSend：/send <target> <threads> <seconds>
 func (s *Server) cmdSend(chatID string, args []string) {
 	if len(args) < 3 {
@@ -99,8 +96,8 @@ func (s *Server) cmdSend(chatID string, args []string) {
 	target := args[0]
 	threads, err1 := strconv.Atoi(args[1])
 	seconds, err2 := strconv.Atoi(args[2])
-	if err1 != nil || err2 != nil || threads < 1 || threads > 64 || seconds < 1 || seconds > 3600 {
-		s.reply(chatID, "参数无效：threads 1-64，seconds 1-3600。")
+	if err1 != nil || err2 != nil || threads < 1 || threads > 64 || seconds < 0 || seconds > 3600 {
+		s.reply(chatID, "参数无效：threads 1-64，seconds 0-3600（0=连续，手动 /stop 才停）。")
 		return
 	}
 	mode := "tcp"
@@ -114,14 +111,17 @@ func (s *Server) cmdSend(chatID string, args []string) {
 		return
 	}
 	s.stats.markSend(target, threads, true)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(seconds)*time.Second)
+	ctx, cancel := s.sendCtx(seconds)
 	s.setSendCancel(cancel)
 	go s.runSend(ctx, target, threads, mode, "", "")
-	s.reply(chatID, fmt.Sprintf("🚀 已启动直发：%d 线程 → %s（%s），持续 %d 秒。", threads, target, mode, seconds))
+	dur := seconds
+	if seconds == 0 {
+		dur = -1 // 连续
+	}
+	s.reply(chatID, fmt.Sprintf("🚀 已启动直发：%d 线程 → %s（%s），%s。", threads, target, mode, fmtDur(dur)))
 }
 
 // cmdBurn：/burn <up|down|both> <size> <target>
-// size 支持如 10MB / 2GB。
 func (s *Server) cmdBurn(chatID string, args []string) {
 	if len(args) < 2 {
 		s.reply(chatID, "用法: /burn <up|down|both> <大小，如100MB/2GB> <host:port 或 http://url>")
@@ -146,7 +146,7 @@ func (s *Server) cmdBurn(chatID string, args []string) {
 		return
 	}
 	s.stats.markSend(target, threads, true)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(seconds)*time.Second)
+	ctx, cancel := s.sendCtx(seconds)
 	s.setSendCancel(cancel)
 	go s.runSend(ctx, target, threads, mode, "", "")
 	s.reply(chatID, fmt.Sprintf("🚀 已启动直发：%d 线程 → %s（%s），持续 %d 秒。", threads, target, mode, seconds))
@@ -161,6 +161,14 @@ func (s *Server) sendStopNow() {
 	if cancel != nil {
 		cancel()
 	}
+}
+
+// fmtDur 友好的时长描述。
+func fmtDur(seconds int) string {
+	if seconds == 0 || seconds == -1 {
+		return "连续（手动 /stop 才停）"
+	}
+	return fmt.Sprintf("持续 %d 秒", seconds)
 }
 
 // humanBytes 人类可读字节。
