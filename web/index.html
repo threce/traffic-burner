@@ -164,7 +164,14 @@
       <div class="field" id="sendCredField"><label>对方用户名（HTTP，可选）</label><input type="text" id="sendUser" style="width:110px"></div>
       <div class="field" id="sendCredPassField"><label>对方密码（HTTP，可选）</label><input type="password" id="sendPass" style="width:110px"></div>
       <div class="field"><label>线程数（1-64）</label><input type="number" id="sendThreads" min="1" max="64" value="16"></div>
-      <div class="field"><label>持续秒数</label><input type="number" id="sendSeconds" min="1" max="3600" value="60"></div>
+      <div class="field"><label>运行时长</label>
+        <select id="sendRun">
+          <option value="limited">限时</option>
+          <option value="continuous">连续（手动停止）</option>
+          <option value="speed">持续测速（手动停止）</option>
+        </select>
+      </div>
+      <div class="field" id="sendSecondsField"><label>秒数</label><input type="number" id="sendSeconds" min="1" max="3600" value="60"></div>
       <button class="btn primary" id="btnSendStart">▶ 开始直发</button>
       <button class="btn danger" id="btnSendStop" disabled>⏹ 停止</button>
     </div>
@@ -350,16 +357,22 @@ $("btnStop").onclick = stopAll;
 
 /* 服务端直发 */
 let sendTimer = null;
+let curSendIsSpeed = false;
 async function startSend() {
   const m = $("sendMode").value, target = $("sendTarget").value.trim();
   const threads = Math.min(64, Math.max(1, parseInt($("sendThreads").value)||1));
-  const seconds = Math.min(3600, Math.max(1, parseInt($("sendSeconds").value)||60));
+  const run = $("sendRun").value;
+  curSendIsSpeed = (run === "speed");
+  let seconds;
+  if (run === "continuous" || run === "speed") { seconds = 0; } // 连续/测速：手动停止才停
+  else { seconds = Math.min(3600, Math.max(1, parseInt($("sendSeconds").value)||60)); }
   if (!target) { $("sendStatus").textContent = "请填写目标地址"; return; }
   try {
     const res = await api("/api/send", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ target, threads, seconds, mode: m, target_user: $("sendUser").value.trim(), target_pass: $("sendPass").value }) });
     if (!res.ok) { $("sendStatus").textContent = "启动失败：" + (await res.text()); return; }
-    $("sendStatus").textContent = `已启动：${threads} 线程（${m}）→ ${target}，持续 ${seconds} 秒。后台运行，可关闭页面。`;
+    const durLabel = (run === "continuous") ? "连续，手动停止" : (run === "speed") ? "持续测速，手动停止" : seconds + " 秒";
+    $("sendStatus").textContent = `已启动：${threads} 线程（${m}）→ ${target}，${durLabel}。后台运行，可关闭页面。`;
     $("btnSendStart").disabled = true; $("btnSendStop").disabled = false;
   } catch(e){ $("sendStatus").textContent = "启动失败：" + e.message; }
 }
@@ -367,6 +380,8 @@ $("btnSendStart").onclick = startSend;
 $("btnSendStop").onclick = async () => { try { await api("/api/sendstop", { method: "POST" }); } catch(e){} $("sendStatus").textContent = "已请求停止。"; $("btnSendStart").disabled=false; $("btnSendStop").disabled=true; };
 function toggleSendCred(){ const isHTTP = $("sendMode").value==="http"; $("sendCredField").classList.toggle("hidden",!isHTTP); $("sendCredPassField").classList.toggle("hidden",!isHTTP); }
 $("sendMode").addEventListener("change", toggleSendCred); toggleSendCred();
+function toggleSendSeconds(){ $("sendSecondsField").classList.toggle("hidden", $("sendRun").value !== "limited"); }
+$("sendRun").addEventListener("change", toggleSendSeconds); toggleSendSeconds();
 
 /* 统计轮询 */
 async function pollStats() {
@@ -381,8 +396,14 @@ async function pollStats() {
     $("stTime").textContent = Math.floor((now - runStartedAt)/1000) + "s";
     if (s.send_running) { $("btnSendStart").disabled=true; $("btnSendStop").disabled=false;
       if (sendTimer!==null) clearInterval(sendTimer); const start = new Date(s.send_started_at).getTime();
-      sendTimer = setInterval(()=>{ $("sendStatus").textContent = `直发进行中… ${Math.floor((Date.now()-start)/1000)}s（${s.send_threads} → ${s.send_target}）`; },1000);
-    } else if (sendTimer!==null) { clearInterval(sendTimer); sendTimer=null; $("btnSendStart").disabled=false; $("btnSendStop").disabled=true; }
+      sendTimer = setInterval(()=>{
+        const el = Math.floor((Date.now()-start)/1000);
+        if (curSendIsSpeed) $("sendStatus").textContent = `⏱ 测速中… ${el}s | 实时速率 ${$("stRate").textContent}（${s.send_threads} → ${s.send_target}）`;
+        else $("sendStatus").textContent = `直发进行中… ${el}s（${s.send_threads} → ${s.send_target}）`;
+      },1000);
+    } else if (sendTimer!==null) { clearInterval(sendTimer); sendTimer=null; $("btnSendStart").disabled=false; $("btnSendStop").disabled=true;
+      if (curSendIsSpeed) $("sendStatus").textContent = `✅ 测速结束。峰值/平均速率见上方实时统计。`; curSendIsSpeed=false;
+    }
   } catch(e){/*忽略*/}
 }
 setInterval(pollStats, 1000);
