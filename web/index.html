@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>">
 <title>Traffic Burner · 流量消耗器</title>
 <style>
   :root {
@@ -87,6 +88,13 @@
   .hint { color: var(--dim); font-size: 12px; margin-top: 12px; line-height: 1.7; }
   #sendStatus { margin-top: 12px; font-size: 13px; color: var(--ok); line-height: 1.6; }
   .err { color: var(--err); font-size: 13px; margin-top: 10px; min-height: 18px; }
+
+  /* 设置面板 */
+  #settingsModal { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 70; background: rgba(8,11,18,.6); }
+  #settingsModal .panel { width: 440px; }
+  .form-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .form-row label { font-size: 12px; color: var(--dim); }
+  .form-row input { width: 100%; }
 </style>
 </head>
 <body>
@@ -94,6 +102,7 @@
   <header>
     <div class="logo">🔥 Traffic Burner <small>流量消耗器 · 内存直发 · 不占硬盘</small></div>
     <div class="topbtns">
+      <button class="btn ghost mini" id="btnSettings">⚙ 设置</button>
       <button class="btn ghost mini" id="btnReset">清零统计</button>
       <button class="btn ghost mini" id="btnLogout">登出</button>
     </div>
@@ -178,6 +187,22 @@
   </div>
 </div>
 
+<!-- 设置面板 -->
+<div id="settingsModal" class="hidden">
+  <div class="card panel">
+    <h2>⚙ 设置</h2>
+    <div class="form-row"><label>管理用户名</label><input type="text" id="setUser" autocomplete="off"></div>
+    <div class="form-row"><label>管理密码（留空则不修改）</label><input type="password" id="setPass" autocomplete="new-password" placeholder="留空保持不变"></div>
+    <div class="form-row"><label>Telegram Bot Token（留空则不修改）</label><input type="text" id="setToken" autocomplete="off" placeholder="留空保持不变"></div>
+    <div class="form-row"><label>Telegram 用户 ID (chat_id)（留空则不修改）</label><input type="text" id="setChat" autocomplete="off" placeholder="留空保持不变"></div>
+    <div style="display:flex;gap:10px;margin-top:6px">
+      <button class="btn primary" id="btnSaveSettings">保存</button>
+      <button class="btn ghost" id="btnCloseSettings">关闭</button>
+    </div>
+    <div class="err" id="setErr"></div>
+  </div>
+</div>
+
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -203,6 +228,41 @@ function logout(clear = true) {
   token = ""; localStorage.removeItem("tb_token"); location.href = "/login";
 }
 $("btnLogout").onclick = () => logout(true);
+
+/* 设置面板 */
+async function openSettings() {
+  try {
+    const res = await api("/api/settings");
+    if (res.ok) {
+      const s = await res.json();
+      $("setUser").value = s.auth_user || "";
+      $("setChat").value = s.chat_id || "";
+      $("setToken").placeholder = s.telegram_token ? "当前: " + s.telegram_token : "留空保持不变";
+      $("setPass").placeholder = s.auth_pass_mask ? "当前已设置密码" : "留空保持不变";
+    }
+  } catch(e){}
+  $("setErr").textContent = "";
+  $("settingsModal").classList.remove("hidden");
+}
+function closeSettings() { $("settingsModal").classList.add("hidden"); }
+async function saveSettings() {
+  const body = {
+    auth_user: $("setUser").value.trim(),
+    auth_pass: $("setPass").value,
+    telegram_token: $("setToken").value.trim(),
+    chat_id: $("setChat").value.trim()
+  };
+  try {
+    const res = await api("/api/settings-update", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const j = await res.json();
+    if (!j.ok) { $("setErr").textContent = j.error || "保存失败"; return; }
+    $("setErr").textContent = "";
+    closeSettings();
+  } catch(e){ $("setErr").textContent = "保存失败：" + e.message; }
+}
+$("btnSettings").onclick = openSettings;
+$("btnCloseSettings").onclick = closeSettings;
+$("btnSaveSettings").onclick = saveSettings;
 
 /* 模式 */
 let mode = "upload";
