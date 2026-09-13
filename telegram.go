@@ -76,7 +76,7 @@ func (b *TelegramBot) SendTo(chatID, text string) error {
 func generateCode() string {
 	b := make([]byte, 4)
 	if _, err := rand.Read(b); err != nil {
-		// 兑底：用时间戳
+		// 兜底：用时间戳
 		return fmt.Sprintf("%06d", time.Now().UnixNano()%1000000)
 	}
 	n := (uint32(b[0])<<24 | uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])) % 1000000
@@ -90,6 +90,7 @@ func (b *TelegramBot) SendLoginCode() (string, error) {
 	b.pending[code] = time.Now().Add(60 * time.Second)
 	b.codeMu.Unlock()
 
+	// 清理过期验证码
 	go func() {
 		time.Sleep(61 * time.Second)
 		b.codeMu.Lock()

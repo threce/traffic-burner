@@ -77,7 +77,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 type sendRequest struct {
 	Target     string `json:"target"`      // host:port（或 http://host:port）
 	Threads    int    `json:"threads"`     // 并发连接数 1-64
-	Seconds    int    `json:"seconds"`     // 持续秒数 1-3600（0=连续）
+	Seconds    int    `json:"seconds"`     // 持续秒数 1-3600
 	Mode       string `json:"mode"`        // "tcp"（默认）或 "http"
 	TargetUser string `json:"target_user"` // http 模式下目标 Basic Auth 用户名（可选）
 	TargetPass string `json:"target_pass"` // http 模式下目标 Basic Auth 密码（可选）
@@ -85,7 +85,11 @@ type sendRequest struct {
 
 // handleSend 服务端主动向目标地址发送数据。
 // POST /api/send  {"target":"1.2.3.4:443","threads":8,"seconds":60}
-// seconds=0 表示连续不限时，手动 /stop 才停。
+//
+//	mode 默认 "tcp"：裸 TCP 写内存数据，出站计入“上传流量”，目标需能读走数据。
+//	mode "http"：向目标发送 HTTP POST 流（通常指向另一个 traffic-burner 的 /api/upload），
+//	             目标端会收下并丢弃，从而在目标服务器上消耗“下载流量”。
+//	出站流量统一计入本机“上传流量”。
 func (s *Server) handleSend(w http.ResponseWriter, r *http.Request) {
 	var req sendRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -108,6 +112,7 @@ func (s *Server) handleSend(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "mode 必须是 tcp 或 http", http.StatusBadRequest)
 		return
 	}
+	// target 校验：tcp 需 host:port；http 需 http(s)://host:port
 	if mode == "tcp" {
 		if _, _, err := net.SplitHostPort(req.Target); err != nil {
 			http.Error(w, "tcp 模式下 target 必须是 host:port 格式", http.StatusBadRequest)
@@ -202,6 +207,7 @@ func (s *Server) sendOne(ctx context.Context, target string) {
 	s.stats.connOpen()
 	defer s.stats.connClose()
 
+	// 连接建立后尽快写入，直到超时或出错
 	deadline, _ := ctx.Deadline()
 	conn.SetWriteDeadline(deadline)
 	for {
@@ -220,10 +226,14 @@ func (s *Server) sendOne(ctx context.Context, target string) {
 	}
 }
 
-// sendHTTP 向目标 HTTP 端点持续发送 POST 请求体。
+// sendHTTP 向目标 HTTP 端点持续发送 POST 请求体（通常指向另一台 traffic-burner 的 /api/upload）。
+// 目标是另一个 traffic-burner 时，其 handleUpload 会收下并丢弃，从而在目标机器上消耗“下载流量”。
+// 本机出站流量同样计入“上传流量”。
+//
+// 实现：每个请求发送一大块数据后关闭 body（让请求正常完结，对端完整接收并统计），再循环发起下一个请求。
 func (s *Server) sendHTTP(ctx context.Context, target, targetUser, targetPass string) {
 	client := &http.Client{Transport: &http.Transport{DisableKeepAlives: false}}
-	const blockSize = 64 << 20
+	const blockSize = 64 << 20 // 每次请求发送 64MB
 	for {
 		select {
 		case <-ctx.Done():
@@ -236,6 +246,7 @@ func (s *Server) sendHTTP(ctx context.Context, target, targetUser, targetPass st
 	}
 }
 
+// sendHTTPOnce 发送一次完整 POST（blockSize 字节），成功返回 true；失败/取消返回 false。
 func (s *Server) sendHTTPOnce(ctx context.Context, client *http.Client, target, targetUser, targetPass string, blockSize int64) bool {
 	pr, pw := io.Pipe()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, pr)
@@ -248,6 +259,7 @@ func (s *Server) sendHTTPOnce(ctx context.Context, client *http.Client, target, 
 	if targetUser != "" {
 		req.SetBasicAuth(targetUser, targetPass)
 	}
+	// 写入固定 blockSize 字节后关闭 body，让请求正常完结（对端能完整读到并统计）。
 	sent := int64(0)
 	go func() {
 		for sent < blockSize {
@@ -269,7 +281,7 @@ func (s *Server) sendHTTPOnce(ctx context.Context, client *http.Client, target, 
 				return
 			}
 		}
-		pw.Close()
+		pw.Close() // 结束请求体
 	}()
 	resp, err := client.Do(req)
 	if err != nil {

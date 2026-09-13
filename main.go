@@ -24,6 +24,7 @@ type Server struct {
 	cfg   Config
 	cfgMu sync.RWMutex // 保护 cfg（设置页可热更新）
 	stats *Stats
+	speed *SpeedMeter
 	buf   []byte // 预生成的随机数据缓冲，循环发送（只占内存，不占硬盘）
 	tg    *TelegramBot
 
@@ -65,6 +66,7 @@ func main() {
 	srv := &Server{
 		cfg:      cfg,
 		stats:    NewStats(),
+		speed:    NewSpeedMeter(),
 		buf:      makeRandomBuffer(16 << 20), // 16MB 内存缓冲
 		tg:       NewTelegramBot(cfg.TelegramToken, cfg.ChatID),
 		sessions: make(map[string]time.Time),
@@ -91,6 +93,9 @@ func main() {
 	mux.HandleFunc("/api/logout", srv.withAuth(srv.handleLogout))
 	mux.HandleFunc("/api/settings", srv.withAuth(http.HandlerFunc(srv.handleSettingsGet)))
 	mux.HandleFunc("/api/settings-update", srv.withAuth(http.HandlerFunc(srv.handleSettingsUpdate)))
+	mux.HandleFunc("/api/speed", srv.withAuth(http.HandlerFunc(srv.handleSpeedStart)))
+	mux.HandleFunc("/api/speed-status", srv.withAuth(http.HandlerFunc(srv.handleSpeedStatus)))
+	mux.HandleFunc("/api/speedstop", srv.withAuth(http.HandlerFunc(srv.handleSpeedStop)))
 	mux.Handle("/", fileServer)
 	mux.HandleFunc("/api/download", srv.withAuth(http.HandlerFunc(srv.handleDownload)))
 	mux.HandleFunc("/api/upload", srv.withAuth(http.HandlerFunc(srv.handleUpload)))

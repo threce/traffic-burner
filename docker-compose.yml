@@ -14,3 +14,6 @@ services:
       TG_CHAT_ID: "${TG_CHAT_ID:-}"
     volumes:
       - ./data:/data
+    # 只有少数需要用到网络流量转发能力，默认 host 网络可让服务端直发发挥最大带宽。
+    # 如果你不想用 host 网络，把 network_mode 注释掉，走默认 bridge + 端口映射即可。
+    # network_mode: host

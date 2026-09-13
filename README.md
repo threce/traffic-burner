@@ -15,6 +15,7 @@
 - **安全登录**：用户名 + 密码 + **Telegram 动态验证码** 三重验证；未配置 TG 时降级为账密登录。
 - **TG 指令控制**：绑定 Telegram Bot 后，可在聊天窗口用指令查看统计/启动/停止消耗、清零等。
 - **实时统计**：Web 页面每秒刷新上传/下载总量、实时速率、活跃连接数。
+- **毛玻璃 UI**：现代化玻璃拟态界面，阴影替代边框。
 
 ## 技术原理
 
@@ -43,6 +44,23 @@ wget -qO- https://raw.githubusercontent.com/threce/traffic-burner/main/deploy.sh
 ```
 
 脚本为**菜单式**：启动后显示 `[1]安装 [2]卸载 [3]更新 [0]退出`，依赖（git/curl/wget/docker/compose）缺失时自动安装，并自动 `git clone` 源码到 `~/traffic-burner-deploy`。访问 `http://<服务器IP>:<端口>`，用你设置的用户名/密码 + Telegram 验证码登录。
+
+#### 一键管理命令（免交互）
+
+不想进菜单时，可以直接带参数执行：
+
+```bash
+# 一键安装
+curl -fsSL https://raw.githubusercontent.com/threce/traffic-burner/main/deploy.sh | bash -s install
+
+# 一键卸载（停止并删除容器 + 镜像 + 部署目录）
+curl -fsSL https://raw.githubusercontent.com/threce/traffic-burner/main/deploy.sh | bash -s uninstall
+
+# 一键更新（拉取最新源码并重建容器）
+curl -fsSL https://raw.githubusercontent.com/threce/traffic-burner/main/deploy.sh | bash -s update
+```
+
+> **不依赖脚本的手动卸载**（万一脚本不可用）：先 `docker stop traffic-burner && docker rm traffic-burner && docker rmi -f traffic-burner:latest`（无权限时给 `docker` 加 `sudo`），再 `rm -rf ~/traffic-burner-deploy ~/.traffic-burner` 即可删干净。
 
 > 在 @BotFather 创建机器人后，把收到的 **Bot Token** 和你的 **Telegram 用户 ID**（访问 @userinfobot 获取）填入对话框，即可启用验证码登录与 TG 指令控制。
 
@@ -116,18 +134,21 @@ docker run -d --name traffic-burner -p 8080:8080 \
 
 ```
 traffic-burner/
-├── main.go        # 入口、路由、登录/会话鉴权
+├── main.go        # 入口、路由、鉴权与会话
 ├── auth.go        # 登录验证码、session token
 ├── commands.go    # Telegram 指令控制
-├── telegram.go    # Telegram Bot（getUpdates长轮询 + 验证码）
+├── telegram.go    # Telegram Bot（getUpdates 长轮询 + 验证码推送）
 ├── handler.go     # 下载/上传/服务端直发/统计 API
+├── settings.go    # 可配置项持久化（用户名/密码/TG 绑定，存 /data/settings.json）
+├── speed.go       # 独立测速（Cloudflare speed，单次 / 持续）
 ├── stats.go       # 全局统计与随机缓冲
 ├── web/
-│   └── index.html # 单页前端（毛玻璃 UI）
+│   ├── index.html # 主页控制台（毛玻璃 UI）
+│   └── login.html # 独立登录页（/login）
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .env.example
-├── deploy.sh      # 菜单式部署脚本（安装/卸载/更新）
+├── deploy.sh      # 管理脚本（菜单式 + 一键参数：install/uninstall/update）
 └── README.md
 ```
 

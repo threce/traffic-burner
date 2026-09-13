@@ -2,11 +2,16 @@
 # =============================================================
 #  traffic-burner 管理脚本（菜单式：安装 / 卸载 / 更新）
 #
-#  用法一（服务器上任意目录，一行命令）：
+#  用法一（服务器上任意目录，交互菜单）：
 #     curl -fsSL https://raw.githubusercontent.com/threce/traffic-burner/main/deploy.sh | bash
 #
-#  用法二：
+#  用法二（wget）：
 #     wget -qO- https://raw.githubusercontent.com/threce/traffic-burner/main/deploy.sh | bash
+#
+#  一键执行（免交互，可选参数 install / uninstall / update）：
+#     安装：curl -fsSL https://raw.githubusercontent.com/threce/traffic-burner/main/deploy.sh | bash -s install
+#     卸载：curl -fsSL https://raw.githubusercontent.com/threce/traffic-burner/main/deploy.sh | bash -s uninstall
+#     更新：curl -fsSL https://raw.githubusercontent.com/threce/traffic-burner/main/deploy.sh | bash -s update
 #
 #  启动后显示菜单：
 #     [1] 安装   [2] 卸载   [3] 更新   [0] 退出
@@ -37,6 +42,30 @@ install_pkg() {
     yum) yum install -y "$@";;
     apk) apk --no-cache add "$@";;
   esac
+}
+
+# ---------- docker 命令封装 + 权限自检 ----------
+# 定义 DOCKER / COMPOSE / COMPOSE_V1；当前用户无法访问 docker daemon 时，
+# 若 sudo 免密则自动切到 sudo。返回非零表示 docker 不可用（不会退出脚本）。
+setup_docker_cmd() {
+  DOCKER="docker"
+  COMPOSE="docker compose"
+  COMPOSE_V1="docker-compose"
+  if docker info >/dev/null 2>&1; then
+    return 0
+  fi
+  if command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
+    echo "  ⚠ 当前用户无 docker 权限，已自动切换为 sudo 执行 docker 命令。"
+    DOCKER="sudo docker"
+    COMPOSE="sudo docker compose"
+    COMPOSE_V1="sudo docker-compose"
+    return 0
+  fi
+  echo "  ❌ 当前用户无 docker 权限，且无法用 sudo 执行。"
+  echo "     请执行下面命令把当前用户加入 docker 组后重新登录，再重跑本脚本："
+  echo "       sudo usermod -aG docker \$USER && newgrp docker"
+  echo "     或直接以 root 运行。"
+  return 1
 }
 
 # 检查并自动安装运行环境依赖；并检测 docker 权限，必要时自动用 sudo 执行
@@ -81,25 +110,7 @@ ensure_deps() {
     fi
   fi
 
-  # ---- docker 权限自检：当前用户无法访问 docker daemon 时，尝试用 sudo ----
-  if ! docker info >/dev/null 2>&1; then
-    if command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
-      echo "  ⚠ 当前用户无 docker 权限，已自动切换为 sudo 执行 docker 命令。"
-      DOCKER="sudo docker"
-      COMPOSE="sudo docker compose"
-      COMPOSE_V1="sudo docker-compose"
-    else
-      echo "  ❌ 当前用户无 docker 权限，且无法用 sudo 执行。"
-      echo "     请执行下面命令把当前用户加入 docker 组后重新登录，再重跑本脚本："
-      echo "       sudo usermod -aG docker \$USER && newgrp docker"
-      echo "     或直接以 root 运行。"
-      exit 1
-    fi
-  else
-    DOCKER="docker"
-    COMPOSE="docker compose"
-    COMPOSE_V1="docker-compose"
-  fi
+  setup_docker_cmd || exit 1
   echo "===== 依赖检查完成 ====="
 }
 
@@ -185,17 +196,26 @@ do_uninstall() {
   echo "------------------------------------------------"
   echo "   🔥 卸载 Traffic Burner"
   echo "------------------------------------------------"
-  if [ ! -d "${WORK_DIR}" ]; then
-    echo "❌ 未找到部署目录 ${WORK_DIR}，可能尚未安装。"
-    return 1
+  local docker_ok=1
+  if setup_docker_cmd; then
+    docker_ok=0
+  else
+    echo "⚠ 无法访问 docker，将只清理本地文件（容器/镜像需你手动删除）。"
   fi
-  echo "✅ 正在停止并移除容器…"
-  (cd "${WORK_DIR}" && compose_down 2>/dev/null || true)
-  echo "✅ 正在删除镜像…"
-  ${DOCKER} rmi traffic-burner:latest 2>/dev/null || true
-  echo "✅ 正在清理工作目录…"
-  rm -rf "${WORK_DIR}"
-  echo "   ✅ 卸载完成，已删除容器、镜像与 ${WORK_DIR}。"
+
+  if [ "${docker_ok}" -eq 0 ]; then
+    if [ -d "${WORK_DIR}" ] && [ -f "${WORK_DIR}/.env" ]; then
+      echo "✅ 正在停止并移除容器…"
+      (cd "${WORK_DIR}" && compose_down 2>/dev/null || true)
+    fi
+    echo "✅ 正在删除容器与镜像…"
+    ${DOCKER} rm -f traffic-burner >/dev/null 2>&1 || true
+    ${DOCKER} rmi -f traffic-burner:latest >/dev/null 2>&1 || true
+  fi
+
+  echo "✅ 正在清理本地文件…"
+  rm -rf "${WORK_DIR}" "${HOME}/.traffic-burner"
+  echo "   ✅ 卸载完成：容器、镜像、${WORK_DIR} 均已清理。"
 }
 
 # ---------- 更新 ----------
@@ -230,6 +250,17 @@ compose_down() {
 
 # ---------- 主菜单 ----------
 main() {
+  # 支持命令行参数，实现一键执行（免交互菜单）：
+  #   bash deploy.sh install | uninstall | update
+  local action="${1:-}"
+  case "${action}" in
+    install|1)          do_install;   exit 0 ;;
+    uninstall|remove|2) do_uninstall; exit 0 ;;
+    update|3)           do_update;    exit 0 ;;
+    "")                 ;;
+    *) echo "❌ 未知参数：${action}（可用：install / uninstall / update）"; exit 1 ;;
+  esac
+
   while true; do
     echo ""
     echo "=============================================="
@@ -252,4 +283,4 @@ main() {
   done
 }
 
-main
+main "$@"

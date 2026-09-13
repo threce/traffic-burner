@@ -179,6 +179,22 @@
     <div class="note">💡 <strong>多机互打</strong>：选「HTTP 打到对方 /api/upload」，目标填另一台 traffic-burner 地址，对方收下并丢弃 → 对方消耗下载、本机消耗上传。两台互相指向即可同时刷满双向，无需浏览器常驻。</div>
   </div>
 
+  <!-- 测速（独立，不消耗流量统计） -->
+  <div class="card">
+    <h2>⚡ 网速测试（Cloudflare Speed）</h2>
+    <div class="row">
+      <div class="field"><label>方向</label>
+        <select id="speedDir"><option value="down">下载</option><option value="up">上传</option></select>
+      </div>
+      <div class="field"><label>模式</label>
+        <select id="speedMode"><option value="once">单次（测完自动停）</option><option value="continuous">持续（手动停止）</option></select>
+      </div>
+      <button class="btn primary" id="btnSpeedStart">▶ 开始测速</button>
+      <button class="btn danger" id="btnSpeedStop" disabled>⏹ 停止</button>
+    </div>
+    <div id="speedResult"></div>
+  </div>
+
   <!-- 统计 -->
   <div class="card">
     <h2>实时统计</h2>
@@ -382,6 +398,36 @@ function toggleSendCred(){ const isHTTP = $("sendMode").value==="http"; $("sendC
 $("sendMode").addEventListener("change", toggleSendCred); toggleSendCred();
 function toggleSendSeconds(){ $("sendSecondsField").classList.toggle("hidden", $("sendRun").value !== "limited"); }
 $("sendRun").addEventListener("change", toggleSendSeconds); toggleSendSeconds();
+
+/* 测速 */
+let speedPoll = null;
+async function startSpeed() {
+  const dir = $("speedDir").value, cont = $("speedMode").value === "continuous";
+  try {
+    const res = await api("/api/speed", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ direction: dir, continuous: cont }) });
+    if (!res.ok) { $("speedResult").textContent = "启动失败：" + (await res.text()); return; }
+    $("btnSpeedStart").disabled = true; $("btnSpeedStop").disabled = false;
+    if (speedPoll) clearInterval(speedPoll);
+    speedPoll = setInterval(pollSpeed, 1000);
+  } catch(e){ $("speedResult").textContent = "启动失败：" + e.message; }
+}
+async function pollSpeed() {
+  try {
+    const res = await api("/api/speed-status"); if (!res.ok) return;
+    const s = await res.json();
+    const dir = s.direction === "up" ? "⬆ 上传" : "⬇ 下载";
+    const mode = s.continuous ? "持续" : "单次";
+    if (s.running) {
+      $("speedResult").textContent = `${dir}测速中（${mode}）… 速率 ${fmt(s.bytes_per_sec)}/s | 已传输 ${fmt(s.total_bytes)}`;
+    } else {
+      $("speedResult").textContent = `✅ ${dir}测速完成（${mode}）：速率 ${fmt(s.bytes_per_sec)}/s | 总传输 ${fmt(s.total_bytes)}`;
+      $("btnSpeedStart").disabled = false; $("btnSpeedStop").disabled = true;
+      if (speedPoll) { clearInterval(speedPoll); speedPoll = null; }
+    }
+  } catch(e){}
+}
+$("btnSpeedStart").onclick = startSpeed;
+$("btnSpeedStop").onclick = async () => { try { await api("/api/speedstop", { method: "POST" }); } catch(e){} $("speedResult").textContent = "⏹ 已停止测速。"; $("btnSpeedStart").disabled=false; $("btnSpeedStop").disabled=true; if (speedPoll){clearInterval(speedPoll); speedPoll=null;} };
 
 /* 统计轮询 */
 async function pollStats() {
